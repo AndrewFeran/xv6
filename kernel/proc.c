@@ -29,6 +29,18 @@ extern void trapret(void);
 static void wakeup1(void *chan);
 
 #if defined(SCHED_LOTTERY)
+// Only the lottery kernel uses rand(); the #if keeps -Werror from
+// rejecting an unused function in the RR and STRIDE kernels.
+static uint rseed = 2463534242;   // any nonzero starting value
+
+static uint
+rand(void)
+{
+  rseed ^= rseed << 13;
+  rseed ^= rseed >> 17;
+  rseed ^= rseed << 5;
+  return rseed;
+}
 #endif
 void
 pinit(void)
