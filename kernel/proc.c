@@ -413,6 +413,18 @@ kill(int pid)
   return -1;
 }
 
+// Set the calling process's tickets and recompute its stride.
+// sys_settickets has already checked that n is valid.
+int
+settickets(int n)
+{
+  acquire(&ptable.lock);
+  proc->tickets = n;
+  proc->stride = STRIDE_BIG / n;
+  release(&ptable.lock);
+  return 0;
+}
+
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
