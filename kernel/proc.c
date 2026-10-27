@@ -5,6 +5,15 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
+
+#if defined(SCHED_LOTTERY)
+#define SCHED_NAME "LOTTERY"
+#elif defined(SCHED_STRIDE)
+#define SCHED_NAME "STRIDE"
+#else
+#define SCHED_NAME "RR"
+#endif
 
 struct {
   struct spinlock lock;
@@ -81,7 +90,8 @@ userinit(void)
 {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
-  
+
+  cprintf("scheduler: %s\n", SCHED_NAME);
   p = allocproc();
   acquire(&ptable.lock);
   initproc = p;
