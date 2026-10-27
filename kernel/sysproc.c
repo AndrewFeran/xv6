@@ -5,6 +5,7 @@
 #include "mmu.h"
 #include "proc.h"
 #include "sysfunc.h"
+#include "pstat.h"
 
 int
 sys_fork(void)
@@ -87,4 +88,34 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+// print a table of all processes
+int
+sys_ps(void)
+{
+  return ps();
+}
+
+// copy per-process statistics into the user's struct pstat
+int
+sys_getpinfo(void)
+{
+  struct pstat *st;
+
+  if(argptr(0, (void*)&st, sizeof(*st)) < 0)
+    return -1;
+  return getpinfo(st);
+}
+
+// set the calling process's tickets: 10 to 200, multiples of 10 only
+int
+sys_settickets(void)
+{
+  int n;
+  if(argint(0, &n) < 0)
+    return -1;
+  if(n < 10 || n > 200 || n % 10 != 0)
+    return -1;
+  return settickets(n);
 }

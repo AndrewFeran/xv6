@@ -2,6 +2,7 @@
 # user programs
 USER_PROGS := \
 	cat\
+	childrentester\
 	echo\
 	forktest\
 	grep\
@@ -10,8 +11,11 @@ USER_PROGS := \
 	ln\
 	ls\
 	mkdir\
+	pstester\
 	rm\
+	schedtest\
 	sh\
+	store\
 	stressfs\
 	tester\
 	usertests\

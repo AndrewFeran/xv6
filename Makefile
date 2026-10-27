@@ -27,6 +27,9 @@ CFLAGS += -Wall
 CFLAGS += -Werror
 # produce debugging information for use by gdb
 CFLAGS += -ggdb
+# gcc 13 (Ubuntu 24.04) warns about sh.c's runcmd(), which calls itself
+# and never returns; with -Werror that warning stops the build
+CFLAGS += -Wno-infinite-recursion
 
 # uncomment to enable optimizations. improves performance, but may make
 # debugging more difficult
@@ -57,7 +60,9 @@ OBJDUMP := objdump
 
 # Try to infer the correct QEMU if not specified
 ifndef QEMU
-QEMU := $(shell if which qemu 1> /dev/null 2> /dev/null; \
+QEMU := $(shell if which qemu-system-i386 1> /dev/null 2> /dev/null; \
+	then echo qemu-system-i386; exit; \
+	elif which qemu 1> /dev/null 2> /dev/null; \
 	then echo qemu; exit; \
 	else \
 	qemu=/u/c/s/cs537-2/ta/tools/qemu; \

@@ -23,5 +23,8 @@ int sys_unlink(void);
 int sys_wait(void);
 int sys_write(void);
 int sys_uptime(void);
+int sys_ps(void);
+int sys_getpinfo(void);
+int sys_settickets(void);
 
 #endif // _SYSFUNC_H_

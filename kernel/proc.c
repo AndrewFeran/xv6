@@ -5,6 +5,15 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
+
+#if defined(SCHED_LOTTERY)
+#define SCHED_NAME "LOTTERY"
+#elif defined(SCHED_STRIDE)
+#define SCHED_NAME "STRIDE"
+#else
+#define SCHED_NAME "RR"
+#endif
 
 struct {
   struct spinlock lock;
@@ -18,6 +27,21 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+
+#if defined(SCHED_LOTTERY)
+// Only the lottery kernel uses rand(); the #if keeps -Werror from
+// rejecting an unused function in the RR and STRIDE kernels.
+static uint rseed = 2463534242;   // any nonzero starting value
+
+static uint
+rand(void)
+{
+  rseed ^= rseed << 13;
+  rseed ^= rseed >> 17;
+  rseed ^= rseed << 5;
+  return rseed;
+}
+#endif
 
 void
 pinit(void)
@@ -45,6 +69,10 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->numTicks = 0;
+  p->tickets = DEFAULT_TICKETS;
+  p->stride  = STRIDE_BIG / p->tickets;
+  p->pass    = 0;   // you will revisit this line in Phase 5
   release(&ptable.lock);
 
   // Allocate kernel stack if possible.
@@ -77,7 +105,8 @@ userinit(void)
 {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
-  
+
+  cprintf("scheduler: %s\n", SCHED_NAME);
   p = allocproc();
   acquire(&ptable.lock);
   initproc = p;
@@ -143,6 +172,8 @@ fork(void)
   }
   np->sz = proc->sz;
   np->parent = proc;
+  np->tickets = proc->tickets;   // child inherits the parent's share
+  np->stride = proc->stride;
   *np->tf = *proc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -256,11 +287,47 @@ void
 scheduler(void)
 {
   struct proc *p;
+#if defined(SCHED_LOTTERY)
+  int total, winner, counter;
+#endif
 
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
+#if defined(SCHED_LOTTERY)
+    acquire(&ptable.lock);
+    // total = sum of tickets of all RUNNABLE processes
+    total = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+      if(p->state == RUNNABLE)
+        total += p->tickets;
+    if(total > 0){
+      winner = rand() % total;     // a number from 0 to total-1
+      counter = 0;
+      // walk ptable; the RUNNABLE process whose tickets cover
+      // winner runs for one time slice
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
+        counter += p->tickets;
+        if(counter > winner){
+          proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
+          p->numTicks += 1;
+          swtch(&cpu->scheduler, proc->context);
+          switchkvm();
+          proc = 0;
+          break;
+        }
+      }
+    }
+    release(&ptable.lock);
+#elif defined(SCHED_STRIDE)
+    // Phase 5 goes here
+#else
+    // The original Round Robin loop from Lab 2, unchanged
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -273,6 +340,7 @@ scheduler(void)
       proc = p;
       switchuvm(p);
       p->state = RUNNING;
+      p->numTicks += 1;
       swtch(&cpu->scheduler, proc->context);
       switchkvm();
 
@@ -281,6 +349,7 @@ scheduler(void)
       proc = 0;
     }
     release(&ptable.lock);
+#endif
 
   }
 }
@@ -405,6 +474,66 @@ kill(int pid)
   }
   release(&ptable.lock);
   return -1;
+}
+
+// Set the calling process's tickets and recompute its stride.
+// sys_settickets has already checked that n is valid.
+int
+settickets(int n)
+{
+  acquire(&ptable.lock);
+  proc->tickets = n;
+  proc->stride = STRIDE_BIG / n;
+  release(&ptable.lock);
+  return 0;
+}
+
+// Fill *ps with one entry per process table slot.
+int
+getpinfo(struct pstat *ps)
+{
+  struct proc *p;
+  int i;
+
+  acquire(&ptable.lock);
+  for(i = 0, p = ptable.proc; p < &ptable.proc[NPROC]; i++, p++){
+    ps->inuse[i] = (p->state != UNUSED);
+    ps->pid[i] = p->pid;
+    ps->tickets[i] = p->tickets;
+    ps->ticks[i] = p->numTicks;
+    ps->stride[i] = p->stride;
+    ps->pass[i] = p->pass;
+    ps->size[i] = p->sz;
+  }
+  release(&ptable.lock);
+  return 0;
+}
+
+// Print a table of all processes to the console.
+int
+ps(void)
+{
+  static char *states[] = {
+  [UNUSED]    "UNUSED  ",
+  [EMBRYO]    "EMBRYO  ",
+  [SLEEPING]  "SLEEPING",
+  [RUNNABLE]  "RUNNABLE",
+  [RUNNING]   "RUNNING ",
+  [ZOMBIE]    "ZOMBIE  "
+  };
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  cprintf("PID  State     Size   Tickets  Stride  Pass  Name\n");
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == UNUSED)
+      continue;
+    cprintf("%d    %s  %d  %d       %d    %d     %s\n",
+            p->pid, states[p->state], p->sz, p->tickets, p->stride,
+            p->pass, p->name);
+  }
+  release(&ptable.lock);
+  return 0;
 }
 
 // Print a process listing to console.  For debugging.
