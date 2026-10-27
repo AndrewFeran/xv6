@@ -13,6 +13,7 @@ USER_PROGS := \
 	mkdir\
 	pstester\
 	rm\
+	schedtest\
 	sh\
 	store\
 	stressfs\
