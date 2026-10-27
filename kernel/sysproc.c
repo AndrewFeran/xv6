@@ -88,3 +88,14 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+// set the calling process's tickets: 10 to 200, multiples of 10 only
+int
+sys_settickets(void)
+{
+  int n;
+  if(argint(0, &n) < 0)
+    return -1;
+  if(n < 10 || n > 200 || n % 10 != 0)
+    return -1;
+  return settickets(n);
+}
