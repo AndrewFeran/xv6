@@ -1,0 +1,17 @@
+*.o
+*.d
+*.asm
+*.sym
+user/bin/
+fs/
+fs.img
+xv6.img
+kernel/kernel
+kernel/bootblock
+kernel/*.out
+kernel/vectors.S
+bootother
+initcode
+tools/mkfs
+.gdbinit
+.sched
