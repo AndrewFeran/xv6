@@ -28,6 +28,8 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
+#if defined(SCHED_LOTTERY)
+#endif
 void
 pinit(void)
 {
@@ -277,6 +279,9 @@ scheduler(void)
     // Enable interrupts on this processor.
     sti();
 
+#elif defined(SCHED_STRIDE)
+    // Phase 5 goes here
+#else
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -297,6 +302,7 @@ scheduler(void)
       proc = 0;
     }
     release(&ptable.lock);
+#endif
 
   }
 }
