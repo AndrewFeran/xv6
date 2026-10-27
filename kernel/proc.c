@@ -45,6 +45,10 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->numTicks = 0;
+  p->tickets = DEFAULT_TICKETS;
+  p->stride  = STRIDE_BIG / p->tickets;
+  p->pass    = 0;   // you will revisit this line in Phase 5
   release(&ptable.lock);
 
   // Allocate kernel stack if possible.
