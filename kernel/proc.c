@@ -147,6 +147,8 @@ fork(void)
   }
   np->sz = proc->sz;
   np->parent = proc;
+  np->tickets = proc->tickets;   // child inherits the parent's share
+  np->stride = proc->stride;
   *np->tf = *proc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
