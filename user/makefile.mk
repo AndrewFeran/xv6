@@ -5,6 +5,7 @@ USER_PROGS := \
 	childrentester\
 	echo\
 	forktest\
+	gamer\
 	grep\
 	init\
 	kill\
