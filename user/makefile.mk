@@ -11,6 +11,7 @@ USER_PROGS := \
 	ln\
 	ls\
 	mkdir\
+	monitor\
 	pstester\
 	rm\
 	schedtest\
