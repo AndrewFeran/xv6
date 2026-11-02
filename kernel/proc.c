@@ -43,6 +43,32 @@ rand(void)
 }
 #endif
 
+// pass of the process the stride scheduler ran most recently;
+// minpass() falls back on it when nothing is RUNNABLE
+static int lastpass;
+
+// Smallest pass among RUNNABLE processes.
+// Caller must hold ptable.lock.
+static int
+minpass(void)
+{
+  struct proc *p;
+  int min, found;
+
+  found = 0;
+  min = 0;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state != RUNNABLE)
+      continue;
+    if(!found || p->pass < min)
+      min = p->pass;
+    found = 1;
+  }
+  if(!found)
+    return lastpass;
+  return min;
+}
+
 void
 pinit(void)
 {
@@ -72,7 +98,9 @@ found:
   p->numTicks = 0;
   p->tickets = DEFAULT_TICKETS;
   p->stride  = STRIDE_BIG / p->tickets;
-  p->pass    = 0;   // you will revisit this line in Phase 5
+  // creation fix: start level with the others, not at 0,
+  // so a newborn cannot win many slices in a row
+  p->pass    = minpass();
   release(&ptable.lock);
 
   // Allocate kernel stack if possible.
@@ -340,6 +368,7 @@ scheduler(void)
     if(best){
       p = best;
       p->pass += p->stride;        // one slice of progress
+      lastpass = p->pass;
       proc = p;
       switchuvm(p);
       p->state = RUNNING;
