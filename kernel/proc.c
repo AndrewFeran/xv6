@@ -289,6 +289,8 @@ scheduler(void)
   struct proc *p;
 #if defined(SCHED_LOTTERY)
   int total, winner, counter;
+#elif defined(SCHED_STRIDE)
+  struct proc *best;
 #endif
 
   for(;;){
@@ -325,7 +327,28 @@ scheduler(void)
     }
     release(&ptable.lock);
 #elif defined(SCHED_STRIDE)
-    // Phase 5 goes here
+    acquire(&ptable.lock);
+    // find the RUNNABLE process with the smallest pass;
+    // strict < means ties go to the first one in the table
+    best = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      if(best == 0 || p->pass < best->pass)
+        best = p;
+    }
+    if(best){
+      p = best;
+      p->pass += p->stride;        // one slice of progress
+      proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      p->numTicks += 1;
+      swtch(&cpu->scheduler, proc->context);
+      switchkvm();
+      proc = 0;
+    }
+    release(&ptable.lock);
 #else
     // The original Round Robin loop from Lab 2, unchanged
     // Loop over process table looking for process to run.
