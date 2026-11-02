@@ -490,10 +490,19 @@ static void
 wakeup1(void *chan)
 {
   struct proc *p;
+  int m;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
+      // wakeup fix: a sleeper's old, low pass would let it take
+      // over the CPU until it caught up, so raise it to the
+      // minimum. Done before RUNNABLE so minpass() does not
+      // count this process's own stale pass.
+      m = minpass();
+      if(p->pass < m)
+        p->pass = m;
       p->state = RUNNABLE;
+    }
 }
 
 // Wake up all processes sleeping on chan.
